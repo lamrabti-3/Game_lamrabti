@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.bak*
+node_modules/
+android/
+*.apk
+*.aab
+.env
+.venv/
+venv/
+*.old

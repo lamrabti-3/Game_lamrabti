@@ -1,0 +1,12 @@
+{
+  "appId": "com.blockarena.app",
+  "appName": "Block Arena",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
