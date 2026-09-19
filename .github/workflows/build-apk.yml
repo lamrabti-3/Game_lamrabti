@@ -35,18 +35,40 @@ jobs:
           if [ -f manifest.json ]; then cp manifest.json www/; fi
           ls -la www/
 
-      - name: Init npm
+      - name: Create package.json
         run: |
-          npm init -y
-          npm install @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest
+          cat > package.json << 'PKGEOF'
+          {
+            "name": "block-arena",
+            "version": "1.0.0",
+            "description": "Block Arena FPS",
+            "private": true
+          }
+          PKGEOF
+          cat package.json
 
-      - name: Capacitor init
-        run: npx cap init "Block Arena" com.blockarena.app --web-dir=www
+      - name: Create capacitor.config.json
+        run: |
+          cat > capacitor.config.json << 'CFGEOF'
+          {
+            "appId": "com.blockarena.app",
+            "appName": "Block Arena",
+            "webDir": "www",
+            "bundledWebRuntime": false,
+            "server": {
+              "androidScheme": "https"
+            }
+          }
+          CFGEOF
+          cat capacitor.config.json
 
-      - name: Add Android
+      - name: Install Capacitor
+        run: npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6
+
+      - name: Add Android platform
         run: npx cap add android
 
-      - name: Sync web
+      - name: Sync web to android
         run: npx cap sync android
 
       - name: Create local.properties
@@ -55,7 +77,7 @@ jobs:
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
           cat local.properties
 
-      - name: Fix gradle wrapper permissions
+      - name: Fix gradle permissions
         run: chmod +x android/gradlew
 
       - name: Build APK (debug)
@@ -66,7 +88,7 @@ jobs:
         if: always()
         run: |
           find . -name "*.apk" -type f
-          ls -la android/app/build/outputs/apk/debug/ 2>/dev/null || echo "no debug dir"
+          ls -la android/app/build/outputs/apk/debug/ 2>/dev/null || echo "no apk"
 
       - name: Upload APK
         if: success()
