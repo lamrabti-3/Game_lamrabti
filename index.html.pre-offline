@@ -39,37 +39,6 @@ input{font-family:inherit;font-weight:700}
   padding:20px;overflow-y:auto}
 .screen.on{display:flex}
 
-
-
-
-/* ═══════════════ OFFLINE MODE ═══════════════ */
-function startOfflineMode(mapIdx){
-  mapIdx = mapIdx != null ? mapIdx : 0;
-  if(!S.mapData) S.mapData = LOCAL_MAPS;
-  var def = S.mapData[mapIdx] || S.mapData[0];
-  S.mapIdx = mapIdx;
-  applyMap(def);
-
-  LocalEngine.start({
-    name: S.myName || 'أنت',
-    skin: S.mySkin || 'blue',
-    arena: def.size,
-    mapIdx: mapIdx,
-    obstacles: def.obstacles
-  });
-  S.ws = LocalEngine.createWS();
-  S.ws.onmessage = function(e){
-    try{ onServerMsg(JSON.parse(e.data)); }
-    catch(err){ console.error('offline:', err); }
-  };
-  S.myId = 1;
-  S.mode = 'playing';
-  setConn('🎮 فردي', '');
-  dom.hud.classList.add('on');
-  dom.loading && dom.loading.classList.remove('on');
-  toast('🎮 بدأت اللعبة الفردية!', 1800);
-}
-
 /* ═══════════════ MENU ═══════════════ */
 #s-menu{background:
   radial-gradient(circle at 20% 30%,#005a8a 0%,transparent 50%),
@@ -105,9 +74,9 @@ function startOfflineMode(mapIdx){
 .mode-btn .txt b{display:block;font-size:16px}
 .mode-btn .txt small{display:block;font-size:11px;
   opacity:.85;font-weight:600;margin-top:2px}
-.mode-btn.offline{background:var(--c-purple,#A855F7)}
-.mode-btn.lan{background:var(--c-green)}
-.mode-btn.online{background:var(--c-blue)}
+.mode-btn.solo{background:var(--c-blue)}
+.mode-btn.friend{background:var(--c-green)}
+.mode-btn.all{background:var(--c-yellow);color:#000}
 .menu-footer{text-align:center;color:#6a7a9a;font-size:11px;
   margin-top:8px;padding-top:8px;border-top:2px dashed rgba(255,255,255,.15)}
 
@@ -436,17 +405,17 @@ body.editing [data-editable].sel{outline-color:var(--c-red);
       <input id="in-server" class="ltr" placeholder="ws://localhost:8080/ws">
       <div class="hint">اتركه فارغاً للاتصال بنفس الجهاز • أو ضع رابط cloudflared</div>
     </div>
-    <button class="mode-btn offline" data-mode="offline">
-      <span class="ico">🎮</span>
-      <div class="txt"><b>فردي (Offline)</b><small>بدون إنترنت ولا سيرفر</small></div>
+    <button class="mode-btn solo" data-mode="solo">
+      <span class="ico">🤖</span>
+      <div class="txt"><b>ضد روبوت</b><small>رفيق آلي يساعدك</small></div>
     </button>
-    <button class="mode-btn lan" data-mode="lan">
-      <span class="ico">📡</span>
-      <div class="txt"><b>مع صديق (واي فاي)</b><small>نفس الشبكة — أدخل IP</small></div>
+    <button class="mode-btn friend" data-mode="friend">
+      <span class="ico">👥</span>
+      <div class="txt"><b>مع صديق</b><small>شارك الرابط</small></div>
     </button>
-    <button class="mode-btn online" data-mode="online">
+    <button class="mode-btn all" data-mode="all">
       <span class="ico">🌍</span>
-      <div class="txt"><b>مع الجميع (إنترنت)</b><small>سيرفر عام</small></div>
+      <div class="txt"><b>مع الجميع</b><small>سيرفر عام</small></div>
     </button>
     <div class="menu-footer" id="srv-status">🟢 جاهز للاتصال</div>
   </div>
@@ -573,43 +542,6 @@ body.editing [data-editable].sel{outline-color:var(--c-red);
 'use strict';
 
 /* ═══════════════ CONFIG ═══════════════ */
-
-/* ═══════════════════════════════════════════════════
-   LOCAL MAPS (للأوفلاين والـ LAN)
-   ═══════════════════════════════════════════════════ */
-function _genObs(size, count, color){
-  var obs=[], tries=0;
-  while(obs.length<count && tries<count*12){
-    tries++;
-    var x = Math.round((Math.random()*(size*2-8) - (size-4))*10)/10;
-    var z = Math.round((Math.random()*(size*2-8) - (size-4))*10)/10;
-    if(Math.abs(x)<3 && Math.abs(z)<3) continue;
-    var w = Math.round((1.5+Math.random()*2.5)*10)/10;
-    var d = Math.round((1.5+Math.random()*2.5)*10)/10;
-    var overlap=false;
-    for(var i=0;i<obs.length;i++){
-      if(Math.abs(x-obs[i].x)<(w+obs[i].w)/2+0.5 &&
-         Math.abs(z-obs[i].z)<(d+obs[i].d)/2+0.5){overlap=true;break;}
-    }
-    if(overlap) continue;
-    obs.push({
-      x:x, z:z, w:w, d:d,
-      h:Math.round((1.5+Math.random()*3.5)*10)/10,
-      c:color
-    });
-  }
-  return obs;
-}
-var LOCAL_MAPS=[
- {name:'الغرفة', size:14, floor:0x2a3f66, sky:0x1a2b4a, g1:0x60a5fa, g2:0x3b5a99, obs_color:0x4466aa, obs_count:6},
- {name:'الساحة', size:18, floor:0x3a3f56, sky:0x1a2b4a, g1:0x60a5fa, g2:0x3b5a99, obs_color:0x4466aa, obs_count:8},
- {name:'المدينة', size:26, floor:0x4a4a4a, sky:0x2a2a3a, g1:0x888888, g2:0x555555, obs_color:0x666666, obs_count:16},
- {name:'الصحراء', size:34, floor:0x8b6b3a, sky:0xd98b4a, g1:0xffaa55, g2:0x885522, obs_color:0x664422, obs_count:20},
- {name:'الفضاء', size:44, floor:0x101020, sky:0x000005, g1:0x8844ff, g2:0x442288, obs_color:0x6644aa, obs_count:26},
- {name:'جزيرة الموت', size:56, floor:0x1a2a1a, sky:0x0a1a0a, g1:0x44aa44, g2:0x1a5a1a, obs_color:0x223322, obs_count:36}
-];
-LOCAL_MAPS.forEach(function(m){ m.obstacles = _genObs(m.size, m.obs_count, m.obs_color); });
-
 var CFG={
   GROUND_Y:0.75, EYE_H:1.6, SPEED:10, SPRINT:1.55,
   GRAVITY:32, JUMP_V:12, BOMB_CD:15,
@@ -1335,15 +1267,11 @@ function escapeHtml(s){
 
 /* ═══════════════ MAPS ═══════════════ */
 function loadMap(idx){
-  if(S.mapData && S.mapData[idx]){ applyMap(S.mapData[idx]); return; }
-  // جرب السيرفر أولاً، وإذا فشل → استعمل LOCAL_MAPS
+  if(S.mapData&&S.mapData[idx]){applyMap(S.mapData[idx]);return}
   fetch('/maps').then(function(r){return r.json()}).then(function(ms){
-    S.mapData = ms;
-    if(S.mapData[idx]) applyMap(S.mapData[idx]);
-  }).catch(function(){
-    S.mapData = LOCAL_MAPS;
-    if(S.mapData[idx]) applyMap(S.mapData[idx]);
-  });
+    S.mapData=ms;
+    if(S.mapData[idx])applyMap(S.mapData[idx]);
+  }).catch(function(){});
 }
 
 function applyMap(def){
@@ -1386,419 +1314,7 @@ function spawnBoom(x,z,color,size){
     mesh.scale.set(s,s,s);
     mat.opacity=1-t;
     requestAnimationFrame(anim);
-  
-/* ═══════════════════════════════════════════════════════════
-   LOCAL ENGINE (Offline Mode)
-   محرك لعبة كامل داخل المتصفح — بدون سيرفر
-   ═══════════════════════════════════════════════════════════ */
-var LocalEngine = (function(){
-  'use strict';
-  var now = function(){ return performance.now() / 1000 };
-  var rand = function(a, b){ return a + Math.random() * (b - a) };
-  var dist = function(ax,az,bx,bz){
-    var dx = ax-bx, dz = az-bz;
-    return Math.sqrt(dx*dx + dz*dz);
-  };
-  var round1 = function(n){ return Math.round(n*10)/10 };
-  var round2 = function(n){ return Math.round(n*100)/100 };
-  var round3 = function(n){ return Math.round(n*1000)/1000 };
-
-  var ENEMY = {
-    zombie: {hp:30, speed:2.2, damage:8, radius:0.7, score:10, ranged:false},
-    runner: {hp:15, speed:5.5, damage:5, radius:0.5, score:15, ranged:false},
-    shooter:{hp:40, speed:1.8, damage:8, radius:0.6, score:25, ranged:true, range:14, fire_cd:1.8},
-    tank:   {hp:150,speed:1.0, damage:20,radius:1.0, score:50, ranged:false},
-    boss:   {hp:600,speed:1.4, damage:30,radius:1.8, score:300,ranged:true, range:22, fire_cd:1.2}
-  };
-
-  var WPN = {
-    pistol: {damage:25, range:35, spread:0.00, pellets:1, cooldown:0.28},
-    rifle:  {damage:14, range:45, spread:0.02, pellets:1, cooldown:0.11},
-    shotgun:{damage:14, range:14, spread:0.18, pellets:6, cooldown:0.65},
-    sniper: {damage:100,range:70, spread:0.00, pellets:1, cooldown:1.2},
-    smg:    {damage:9,  range:28, spread:0.07, pellets:1, cooldown:0.07}
-  };
-
-  var L = {
-    startedAt: 0, tickTimer: null, ws: null,
-    myId: 1, arena: 60, mapIdx: 5,
-    players: {}, enemies: [], coins: [], powerups: [],
-    nextEid: 1, nextCid: 1, nextPuid: 1,
-    wave: 0, waveNextAt: 0,
-    dangerActive: false, dcx: 0, dcz: 0, dr: 0,
-    dangerStartAt: 0, obstacles: []
-  };
-
-  function arena(){ return L.arena }
-
-  function enemyCfg(t){ return ENEMY[t] || ENEMY.zombie }
-
-  function isSafe(x, z, margin){
-    margin = margin || 1.0;
-    for(var i=0;i<L.obstacles.length;i++){
-      var o = L.obstacles[i];
-      if(Math.abs(x-o.x) < o.w/2+margin && Math.abs(z-o.z) < o.d/2+margin){
-        return false;
-      }
-    }
-    return true;
-  }
-
-  function safeSpawn(){
-    for(var i=0;i<50;i++){
-      var x = rand(-L.arena*0.8, L.arena*0.8);
-      var z = rand(-L.arena*0.8, L.arena*0.8);
-      if(isSafe(x, z)) return {x:x, z:z};
-    }
-    return {x:0, z:0};
-  }
-
-  function emit(msg){
-    if(L.ws && L.ws.onmessage){
-      try{ L.ws.onmessage({data: JSON.stringify(msg)}); }catch(e){}
-    }
-  }
-
-  function initMe(name, skin){
-    var sp = safeSpawn();
-    L.players[L.myId] = {
-      id: L.myId, name: name || 'أنت', skin: skin || 'blue',
-      x: sp.x, y: 0.75, z: sp.z, ry: 0,
-      score: 0, kills: 0, deaths: 0, alive: true,
-      hp: 100, max_hp: 100, shield: 0,
-      last_shot: 0, last_bomb: 0,
-      speed_until: 0, damage_until: 0
-    };
-  }
-
-  function damageMe(amount){
-    var p = L.players[L.myId];
-    if(python3 - << 'PYEOF'
-src=open('server.py').read()
-if 'os.environ' not in src:
-    src=src.replace(
-        'PORT=8080',
-        'PORT=int(os.environ.get("PORT",8080))'
-    )
-    open('server.py','w').write(src)
-    print('✅ PORT يقرأ من البيئة')
-else:
-    print('ℹ️ محدّث مسبقاً')
-PYEOF || !p.alive) return;
-    if(p.shield > 0){
-      p.shield = Math.max(0, p.shield - amount);
-      return;
-    }
-    p.hp -= amount;
-    if(p.hp <= 0){
-      p.hp = 0;
-      p.alive = false;
-      p.deaths++;
-      emit({type:'kill', killer:'enemy', victim:'player', pid:L.myId});
-    }
-  }
-
-  function spawnEnemy(type){
-    var cfg = enemyCfg(type);
-    var side = Math.random() < 0.5 ? 1 : -1;
-    var x, z;
-    if(Math.random() < 0.5){
-      x = rand(-L.arena+2, L.arena-2);
-      z = side * (L.arena - 1);
-    } else {
-      x = side * (L.arena - 1);
-      z = rand(-L.arena+2, L.arena-2);
-    }
-    L.enemies.push({
-      id: L.nextEid++, type: type, x: x, z: z,
-      hp: cfg.hp, max_hp: cfg.hp, last_fire: 0
-    });
-  }
-
-  function spawnWave(){
-    L.wave++;
-    var count = 3 + L.wave * 2;
-    var pool = ['zombie','zombie','zombie','zombie','runner','runner','shooter','shooter'];
-    if(L.wave >= 4) pool.push('tank');
-    if(L.wave % 5 === 0){
-      var bosses = 1 + Math.floor(L.wave / 10);
-      for(var b=0;b<bosses;b++) spawnEnemy('boss');
-    }
-    for(var i=0;i<count;i++){
-      spawnEnemy(pool[Math.floor(Math.random()*pool.length)]);
-    }
-    emit({type:'wave', number:L.wave, count:count});
-  }
-
-  function tick(){
-    if(!L.startedAt) return;
-    var t = now();
-    var dt = 1/30;
-    var me = L.players[L.myId];
-
-    // Wave spawning
-    if(t >= L.waveNextAt){
-      spawnWave();
-      L.waveNextAt = t + 30;
-    }
-
-    // Coins spawn
-    if(L.coins.length < 12 && Math.random() < 0.02/30){
-      var cp = safeSpawn();
-      L.coins.push({id: L.nextCid++, x: cp.x, z: cp.z});
-    }
-    // Powerups spawn
-    if(L.powerups.length < 4 && Math.random() < 0.01/30){
-      var pp = safeSpawn();
-      var types = ['health','speed','shield','damage'];
-      L.powerups.push({
-        id: L.nextPuid++, type: types[Math.floor(Math.random()*4)],
-        x: pp.x, z: pp.z
-      });
-    }
-
-    // Enemy AI
-    for(var i=0;i<L.enemies.length;i++){
-      var e = L.enemies[i];
-      var cfg = enemyCfg(e.type);
-      if(!me || !me.alive) continue;
-      var dx = me.x - e.x, dz = me.z - e.z;
-      var d = Math.sqrt(dx*dx + dz*dz) || 1;
-      if(cfg.ranged && d < cfg.range){
-        if(t - e.last_fire > cfg.fire_cd){
-          e.last_fire = t;
-          emit({type:'enemyShot', eid: e.id, x: e.x, z: e.z});
-          if(Math.random() < 0.6) damageMe(cfg.damage);
-        }
-      } else if(d > cfg.radius + 0.5){
-        e.x += dx/d * cfg.speed * dt;
-        e.z += dz/d * cfg.speed * dt;
-      } else {
-        if(t - e.last_fire > 0.8){
-          e.last_fire = t;
-          damageMe(cfg.damage);
-        }
-      }
-      e.x = Math.max(-L.arena+0.5, Math.min(L.arena-0.5, e.x));
-      e.z = Math.max(-L.arena+0.5, Math.min(L.arena-0.5, e.z));
-    }
-
-    // Pickups
-    if(me && me.alive){
-      for(var ci=L.coins.length-1; ci>=0; ci--){
-        var c = L.coins[ci];
-        if(dist(me.x, me.z, c.x, c.z) < 1.2){
-          L.coins.splice(ci, 1);
-          me.score += 5;
-        }
-      }
-      for(var pi=L.powerups.length-1; pi>=0; pi--){
-        var pu = L.powerups[pi];
-        if(dist(me.x, me.z, pu.x, pu.z) < 1.3){
-          if(pu.type === 'health') me.hp = Math.min(me.max_hp, me.hp + 50);
-          else if(pu.type === 'shield') me.shield = Math.min(100, me.shield + 50);
-          else if(pu.type === 'speed') me.speed_until = t + 15;
-          else if(pu.type === 'damage') me.damage_until = t + 15;
-          emit({type:'powerup', pid: L.myId, kind: pu.type});
-          L.powerups.splice(pi, 1);
-        }
-      }
-    }
-
-    // Danger zone
-    if(!L.dangerActive && t >= L.dangerStartAt){
-      L.dangerActive = true;
-      L.dcx = rand(-L.arena*0.3, L.arena*0.3);
-      L.dcz = rand(-L.arena*0.3, L.arena*0.3);
-      L.dr = L.arena * 1.2;
-      emit({type:'dangerStart', x:L.dcx, z:L.dcz, r:L.dr});
-    }
-    if(L.dangerActive){
-      L.dr = Math.max(4, L.dr - 0.06 * dt);
-      if(me && me.alive && dist(me.x, me.z, L.dcx, L.dcz) > L.dr){
-        damageMe(1 * dt * 10);
-      }
-    }
-
-    // Cleanup
-    for(var ei=L.enemies.length-1; ei>=0; ei--){
-      if(L.enemies[ei].hp <= 0) L.enemies.splice(ei, 1);
-    }
-
-    // State broadcast
-    emitState();
-  }
-
-  function emitState(){
-    var me = L.players[L.myId];
-    if(!me) return;
-    var pls = {};
-    pls[L.myId] = {
-      x: round2(me.x), y: round2(me.y), z: round2(me.z),
-      ry: round3(me.ry), skin: me.skin, name: me.name,
-      score: me.score, kills: me.kills, deaths: me.deaths,
-      alive: me.alive, hp: round1(me.hp), shield: round1(me.shield)
-    };
-    emit({
-      type: 'state', map: L.mapIdx, wave: L.wave,
-      nextWave: Math.max(0, L.waveNextAt - now()),
-      size: L.arena,
-      danger: {active: L.dangerActive, x: L.dcx, z: L.dcz, r: L.dr},
-      players: pls,
-      enemies: L.enemies.map(function(e){
-        return {id:e.id, type:e.type, x:round2(e.x), z:round2(e.z), hp:round1(e.hp)};
-      }),
-      coins: L.coins.map(function(c){
-        return {id:c.id, x:round2(c.x), z:round2(c.z)};
-      }),
-      powerups: L.powerups.map(function(p){
-        return {id:p.id, type:p.type, x:round2(p.x), z:round2(p.z)};
-      })
-    });
-  }
-
-  function handleShoot(weapon){
-    var me = L.players[L.myId];
-    if(!me || !me.alive) return;
-    var cfg = WPN[weapon];
-    if(!cfg) return;
-    var t = now();
-    if(t - me.last_shot < cfg.cooldown) return;
-    me.last_shot = t;
-    var dmg = cfg.damage * (t < me.damage_until ? 2 : 1);
-
-    var hit = null;
-    for(var pe=0; pe<cfg.pellets; pe++){
-      var ang = me.ry + rand(-cfg.spread, cfg.spread);
-      var dx = Math.sin(ang), dz = Math.cos(ang);
-      var bd = cfg.range + 1;
-      for(var i=0;i<L.enemies.length;i++){
-        var e = L.enemies[i];
-        var ex = e.x - me.x, ez = e.z - me.z;
-        var pr = ex*dx + ez*dz;
-        if(pr < 0 || pr > cfg.range) continue;
-        var pp = Math.abs(ex*dz - ez*dx);
-        if(pp < enemyCfg(e.type).radius && pr < bd){
-          hit = e; bd = pr;
-        }
-      }
-      if(hit) break;
-    }
-    if(hit){
-      hit.hp -= dmg;
-      if(hit.hp <= 0){
-        me.score += enemyCfg(hit.type).score;
-        me.kills++;
-        emit({type:'kill', killer:L.myId, victim:'enemy', etype:hit.type});
-      }
-    }
-  }
-
-  function handleBomb(){
-    var me = L.players[L.myId];
-    if(!me || !me.alive) return;
-    var t = now();
-    if(t - me.last_bomb < 15) return;
-    me.last_bomb = t;
-    emit({type:'bomb', x: me.x, z: me.z});
-    for(var i=L.enemies.length-1; i>=0; i--){
-      var e = L.enemies[i];
-      if(dist(me.x, me.z, e.x, e.z) < 8){
-        e.hp -= 120;
-        if(e.hp <= 0){
-          me.score += enemyCfg(e.type).score;
-          me.kills++;
-          emit({type:'kill', killer:L.myId, victim:'enemy', etype:e.type});
-        }
-      }
-    }
-  }
-
-  function handleClientMsg(msg){
-    var me = L.players[L.myId];
-    if(!me) return;
-    switch(msg.type){
-      case 'move':
-        if(typeof msg.x === 'number') me.x = Math.max(-L.arena+1, Math.min(L.arena-1, msg.x));
-        if(typeof msg.y === 'number') me.y = msg.y;
-        if(typeof msg.z === 'number') me.z = Math.max(-L.arena+1, Math.min(L.arena-1, msg.z));
-        if(typeof msg.ry === 'number') me.ry = msg.ry;
-        if(typeof msg.skin === 'string') me.skin = msg.skin;
-        break;
-      case 'shoot': handleShoot(msg.weapon); break;
-      case 'bomb': handleBomb(); break;
-      case 'respawn':
-        me.alive = true; me.hp = 100; me.shield = 0;
-        var sp = safeSpawn(); me.x = sp.x; me.z = sp.z;
-        break;
-      case 'setName':
-        if(typeof msg.name === 'string') me.name = msg.name.slice(0, 16);
-        break;
-      case 'addBot':
-        // In offline mode, we don't have bots — just skip
-        break;
-      // friend requests silently ignored
-      case 'friendRequest':
-      case 'friendAccept':
-      case 'friendDecline':
-        break;
-      case 'chat':
-        // echo chat locally
-        if(typeof msg.text === 'string'){
-          emit({type:'chat', pid: L.myId, text: msg.text.slice(0, 80)});
-        }
-        break;
-    }
-  }
-
-  return {
-    start: function(opts){
-      opts = opts || {};
-      L.startedAt = now();
-      L.arena = opts.arena || 60;
-      L.mapIdx = opts.mapIdx != null ? opts.mapIdx : 5;
-      L.obstacles = opts.obstacles || [];
-      L.wave = 0;
-      L.waveNextAt = now() + 10;
-      L.dangerActive = false;
-      L.dangerStartAt = now() + 300;
-      L.enemies = []; L.coins = []; L.powerups = [];
-      L.nextEid = 1; L.nextCid = 1; L.nextPuid = 1;
-      initMe(opts.name, opts.skin);
-      if(L.tickTimer) clearInterval(L.tickTimer);
-      L.tickTimer = setInterval(tick, 33);
-    },
-    createWS: function(){
-      var fake = {
-        readyState: 1,
-        onopen: null, onmessage: null, onclose: null, onerror: null,
-        send: function(str){
-          try{ handleClientMsg(JSON.parse(str)); }catch(e){}
-        },
-        close: function(){
-          if(L.tickTimer){ clearInterval(L.tickTimer); L.tickTimer = null; }
-          if(fake.onclose) fake.onclose();
-        },
-        addEventListener: function(){},
-        removeEventListener: function(){}
-      };
-      L.ws = fake;
-      setTimeout(function(){
-        if(fake.onopen) fake.onopen();
-        if(fake.onmessage){
-          fake.onmessage({data: JSON.stringify({
-            type: 'welcome', id: L.myId, map: L.mapIdx,
-            size: L.arena, chat: [], maxPlayers: 1
-          })});
-        }
-      }, 50);
-      return fake;
-    },
-    isRunning: function(){ return git pushL.startedAt }
-  };
-})();
-
-})();
+  })();
 }
 
 /* ═══════════════ INPUT: PC ═══════════════ */
