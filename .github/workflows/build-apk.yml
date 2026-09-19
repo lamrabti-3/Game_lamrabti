@@ -82,7 +82,7 @@ jobs:
 
       - name: Build APK (debug)
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Find APK
         if: always()
@@ -95,5 +95,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: BlockArena-APK
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
