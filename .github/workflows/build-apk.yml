@@ -21,19 +21,25 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Capacitor
+      - name: Prepare www
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "Block Arena" com.blockarena.app --web-dir=www || true
+          mkdir -p www
+          cp index.html www/index.html
+          cp manifest.json www/ 2>/dev/null || true
 
-      - name: Copy config
-        run: |
-          cp capacitor.config.json . 2>/dev/null || true
+      - name: Init npm
+        run: npm init -y
+
+      - name: Install Capacitor
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Capacitor init
+        run: npx cap init "Block Arena" com.blockarena.app --web-dir=www
 
       - name: Add Android platform
         run: npx cap add android
 
-      - name: Sync web
+      - name: Sync
         run: npx cap sync android
 
       - name: Build APK
