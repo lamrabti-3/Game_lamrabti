@@ -356,6 +356,19 @@ font-weight:900;text-shadow:0 2px 0 #000;display:none}
 
 <div id="menu">
   <h1>BLOCK ARENA</h1>
+  <div id="serverSetup" style="width:min(340px,90%);margin:10px 0">
+    <label style="color:#fff;font-size:13px;font-weight:900;display:block;margin-bottom:6px;text-shadow:0 2px 0 #000">
+      🌐 عنوان السيرفر
+    </label>
+    <input id="serverInput" type="text"
+      placeholder="ws://localhost:8080/ws"
+      style="width:100%;padding:12px;border-radius:10px;border:3px solid #000;
+      font-size:12px;background:#fff;font-family:monospace;
+      direction:ltr;text-align:left;font-weight:700">
+    <div style="color:#fff;font-size:10px;margin-top:4px;opacity:.85;text-align:center;text-shadow:0 1px 0 #000">
+      فارغ = نفس الجهاز • أو رابط cloudflared
+    </div>
+  </div>
   <p>اختر طريقة اللعب</p>
   <button class="mBtn bot" data-m="bot">
     <span class="ico">🤖</span>
@@ -733,8 +746,14 @@ var mmC=document.getElementById('mmC'),mmCtx=mmC.getContext('2d');
 var hud=document.getElementById('hud');
 
 function connectWS(){
- var proto=location.protocol==='https:'?'wss:':'ws:';
- ws=new WebSocket(proto+'//'+location.host+'/ws');
+ var saved=localStorage.getItem('serverUrl')||'';
+ var url=saved;
+ if(!url){
+  var proto=location.protocol==='https:'?'wss:':'ws:';
+  url=proto+'//'+location.host+'/ws';
+ }
+ console.log('🔗 WebSocket:', url);
+ ws=new WebSocket(url);
  ws.onopen=function(){connEl.textContent='متصل ✓';connEl.classList.remove('off')};
  ws.onmessage=function(e){try{onMsg(JSON.parse(e.data))}catch(err){console.error(err)}};
  ws.onclose=function(){connEl.textContent='انقطع...';connEl.classList.add('off');
@@ -1192,6 +1211,12 @@ function sendChat(){
 document.querySelectorAll('.mBtn').forEach(function(b){
  b.onclick=function(e){
   e.preventDefault();initA();
+  var inp=document.getElementById('serverInput');
+  if(inp){
+   var v=inp.value.trim();
+   if(v)localStorage.setItem('serverUrl',v);
+   else localStorage.removeItem('serverUrl');
+  }
   gameMode=b.dataset.m;
   document.getElementById('menu').classList.add('hide');
   document.getElementById('wait').classList.add('on');
@@ -1427,6 +1452,12 @@ document.getElementById('bUI').addEventListener('pointerdown',function(e){
    };});
  },10);
 });
+
+// املأ خانة السيرفر بالقيمة المحفوظة
+setTimeout(function(){
+ var inp=document.getElementById('serverInput');
+ if(inp){var s=localStorage.getItem('serverUrl');if(s)inp.value=s;}
+},100);
 
 // بدء
 camera.position.set(0,1.6,0);
